@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>mini_reto_s2</name>
+  <version>0.1.0</version>
+  <description>
+    Mini reto Semana 2 - TE3002B Robots Moviles. Almacen robotico colaborativo:
+    Husky despeja un corredor, ANYmal trota cargando 3 PuzzleBots, los PuzzleBots
+    apilan cajas con un mini brazo de 3 DoF. Logica pura en Python; los nodos
+    rclpy son envoltorios delgados que publican el estado de la simulacion.
+  </description>
+  <maintainer email="daniel-wlg@local">daniel-wlg</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>python3-numpy</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
