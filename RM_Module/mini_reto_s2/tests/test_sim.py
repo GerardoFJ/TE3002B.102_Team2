@@ -32,24 +32,22 @@ class TestFrameBuilder(unittest.TestCase):
     def test_frames_non_empty(self):
         self.assertGreater(len(self.frames), 0)
 
-    def test_all_three_phases_present(self):
+    def test_all_phases_present(self):
         phases = {f['phase'] for f in self.frames}
-        self.assertEqual(phases, {1, 2, 3})
+        self.assertEqual(phases, {1, 2, 2.5})
 
     def test_frame_schema(self):
         """Cada frame contiene las claves esperadas."""
-        required = {'phase', 'husky', 'anymal', 'puzzlebots',
-                    'big_boxes', 'small_boxes', 'stack_count'}
-        for f in self.frames[::25]:
-            with self.subTest(idx=self.frames.index(f)):
+        required = {'phase', 'husky', 'anymal', 'puzzlebots', 'big_boxes'}
+        for idx in range(0, len(self.frames), 25):
+            f = self.frames[idx]
+            with self.subTest(idx=idx):
                 self.assertTrue(required.issubset(f.keys()))
                 self.assertEqual(len(f['puzzlebots']), 3)
                 self.assertEqual(len(f['big_boxes']), 3)
-                self.assertEqual(set(f['small_boxes'].keys()),
-                                 {'A', 'B', 'C'})
 
     def test_phase_ordering(self):
-        """Las fases aparecen en orden 1 -> 2 -> 3 (sin retroceso)."""
+        """Las fases aparecen en orden 1 -> 2 -> 2.5 (sin retroceso)."""
         last = 0
         for f in self.frames:
             self.assertGreaterEqual(f['phase'], last)
@@ -62,7 +60,6 @@ class TestFrameBuilder(unittest.TestCase):
         anymal_y = {f['anymal'][1] for f in phase1}
         self.assertEqual(len(anymal_x), 1)   # constante
         self.assertEqual(len(anymal_y), 1)
-        # Husky se mueve
         husky_xs = [f['husky'][0] for f in phase1]
         self.assertGreater(max(husky_xs) - min(husky_xs), 1.0)
 
@@ -78,30 +75,22 @@ class TestFrameBuilder(unittest.TestCase):
     def test_phase2_puzzlebots_track_anymal(self):
         """En fase 2 los 3 PuzzleBots se mueven con el ANYmal."""
         phase2 = [f for f in self.frames if f['phase'] == 2]
-        # Cada pb deberia tener al menos 2 posiciones distintas
         for idx in range(3):
             xs = {round(f['puzzlebots'][idx][0], 4) for f in phase2}
             with self.subTest(pb=idx):
                 self.assertGreater(len(xs), 1)
 
-    def test_phase3_stacks_grow(self):
-        """stack_count crece monotonamente en fase 3 hasta llegar a 3."""
-        phase3 = [f for f in self.frames if f['phase'] == 3]
-        self.assertGreater(len(phase3), 0)
-        counts = [f['stack_count'] for f in phase3]
-        # Monotono no decreciente
-        for a, b in zip(counts, counts[1:]):
-            self.assertLessEqual(a, b)
-        self.assertEqual(max(counts), 3)
-
-    def test_phase3_final_boxes_at_stack(self):
-        """En el ultimo frame las 3 cajas pequenas estan en la pila."""
+    def test_phase2_5_pbs_end_on_table(self):
+        """Al final de fase 2.5 los 3 PBs estan en sus drops de la mesa."""
         last = self.frames[-1]
-        wz = self.vis.coord.work_zone
-        for name, (pos, status) in last['small_boxes'].items():
-            with self.subTest(box=name):
-                self.assertTrue(status.startswith('stack'))
-                np.testing.assert_allclose(pos, wz.stack_xy, atol=1e-9)
+        self.assertEqual(last['phase'], 2.5)
+        drops = self.vis.coord.PB_TABLE_DROP
+        pbs = last['puzzlebots']                 # orden [C, B, A]
+        for idx, role in enumerate(('C', 'B', 'A')):
+            with self.subTest(role=role):
+                px, py, _ = pbs[idx]
+                self.assertAlmostEqual(px, drops[role][0], places=4)
+                self.assertAlmostEqual(py, drops[role][1], places=4)
 
 
 class TestStrideRespected(unittest.TestCase):

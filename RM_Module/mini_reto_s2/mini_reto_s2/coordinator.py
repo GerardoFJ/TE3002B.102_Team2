@@ -13,14 +13,12 @@ PHASE 1 - HUSKY_CLEAR
 
 PHASE 2 - ANYMAL_TRANSPORT
     El ANYmal camina en trote desde la zona de inicio hasta el punto
-    p_destino = (11.0, 3.6) cargando 3 PuzzleBots sobre el dorso.
+    p_destino cargando 3 PuzzleBots sobre el dorso.
     Delegado a simulate_anymal_to_target().
 
-PHASE 3 - PUZZLEBOT_STACK
-    Los 3 PuzzleBots, cada uno con un mini brazo de 3 DoF, recogen una
-    caja pequena (A, B o C) y la apilan en la pila destino. Orden
-    obligatorio C abajo, B en medio, A arriba. Coordinacion via
-    time-slotting (solo un PuzzleBot activo a la vez).
+PHASE 2.5 - XARM_TRANSFER
+    Un xArm 6 fijo junto a la mesa baja los 3 PuzzleBots del dorso del
+    ANYmal y los deposita sobre una mesa. Con eso termina la mision.
 """
 
 import math
@@ -28,111 +26,28 @@ import math
 import numpy as np
 
 from .robots_base import HuskyA200, ANYmal, PuzzleBot
-from .puzzlebot_arm import PuzzleBotArm
 from .husky_pusher import HuskyPusher, CorridorWorld
 from .anymal_gait import simulate_anymal_to_target
+from .xarm import XArm
 
 
 # ===========================================================================
-#  Modelos del entorno de la fase 3
-# ===========================================================================
-class SmallBox:
-    """Caja pequena (4 cm de lado) para los mini brazos."""
-
-    def __init__(self, name, xy, z=0.05, side=0.02):
-        self.name = name
-        self.xy = np.array(xy, dtype=float)
-        self.z = float(z)             # Altura del centro [m]
-        self.side = float(side)       # Half-side [m]
-        self.placed = False
-
-    @property
-    def position(self):
-        return np.array([self.xy[0], self.xy[1], self.z])
-
-
-class WorkZone:
-    """Zona de trabajo: 3 cajas pequenas + un punto de apilado."""
-
-    def __init__(self,
-                 box_a=(12.00, 3.45),
-                 box_b=(12.30, 3.45),
-                 box_c=(12.60, 3.45),
-                 stack_xy=(12.30, 3.85),
-                 table_z=0.05):
-        self.boxes = {
-            'A': SmallBox('A', box_a, z=table_z),
-            'B': SmallBox('B', box_b, z=table_z),
-            'C': SmallBox('C', box_c, z=table_z),
-        }
-        self.stack_xy = np.array(stack_xy, dtype=float)
-        self.table_z = float(table_z)
-        # Numero de cajas ya apiladas (0, 1, 2, 3)
-        self.stack_count = 0
-        # Altura entre centros de cajas adyacentes en la pila
-        self.layer_height = 2.0 * self.boxes['A'].side + 0.005
-
-
-# ===========================================================================
-#  Unidad PuzzleBot + brazo
+#  Unidad PuzzleBot (sin brazo; solo pasajero del ANYmal)
 # ===========================================================================
 class PuzzleBotUnit:
-    """Una unidad fisica del reto: PuzzleBot + brazo + caja asignada.
+    """Un PuzzleBot pasajero del mini reto.
 
-    El brazo esta montado en el centro del PuzzleBot a la altura de la
-    base (altura del shoulder = ``arm.l1`` sobre el suelo del bot).
+    Solo necesita su base movil; el xArm se encarga de agarrarlo. La
+    clase existe para conservar un nombre humano (PB_A/B/C) y la pose
+    final en la mesa.
     """
 
-    def __init__(self, name, role_box, start_xy=(11.0, 3.6),
-                 base_kwargs=None, arm_kwargs=None):
+    def __init__(self, name, role, start_xy=(11.0, 3.6),
+                 base_kwargs=None):
         self.name = name
-        self.role_box = role_box                # 'A', 'B', 'C'
+        self.role = role                        # 'A', 'B', 'C'
         self.base = PuzzleBot(**(base_kwargs or {}))
-        self.arm = PuzzleBotArm(**(arm_kwargs or {}))
         self.base.reset(start_xy[0], start_xy[1], 0.0)
-        self.arm.reset()
-
-
-# ===========================================================================
-#  Helper: drive a PuzzleBot to a 2D point
-# ===========================================================================
-def drive_puzzlebot_to(pb, target_xy, dt=0.05, eps=0.05,
-                       v_max=0.4, omega_max=1.5,
-                       angle_threshold_deg=12.0,
-                       max_steps=600):
-    """Lleva un PuzzleBot a un punto (x, y) con go-to-pose. Devuelve el log."""
-    log = {'t': [], 'x': [], 'y': [], 'theta': [],
-           'v_cmd': [], 'omega_cmd': []}
-    angle_thresh = math.radians(angle_threshold_deg)
-    for i in range(max_steps):
-        x, y, th = pb.get_pose()
-        dx = target_xy[0] - x
-        dy = target_xy[1] - y
-        dist = math.hypot(dx, dy)
-        if dist < eps:
-            break
-        target_yaw = math.atan2(dy, dx)
-        yaw_err = math.atan2(math.sin(target_yaw - th),
-                             math.cos(target_yaw - th))
-        if abs(yaw_err) > angle_thresh:
-            v_cmd = 0.0
-            omega_cmd = float(np.clip(2.0 * yaw_err, -omega_max, omega_max))
-        else:
-            v_cmd = float(np.clip(0.6 * dist, 0.0, v_max))
-            v_cmd *= max(0.0, math.cos(yaw_err))
-            omega_cmd = float(np.clip(2.0 * yaw_err, -omega_max, omega_max))
-
-        wR, wL = pb.inverse_kinematics(v_cmd, omega_cmd)
-        v_real, omega_real = pb.forward_kinematics(wR, wL)
-        pb.update_pose(v_real, omega_real, dt)
-
-        log['t'].append(i * dt)
-        log['x'].append(pb.x)
-        log['y'].append(pb.y)
-        log['theta'].append(pb.theta)
-        log['v_cmd'].append(v_cmd)
-        log['omega_cmd'].append(omega_cmd)
-    return log
 
 
 # ===========================================================================
@@ -146,17 +61,38 @@ class MissionCoordinator:
         coord = MissionCoordinator()
         log = coord.run()
 
-    El log es un dict con tres entradas (``phase1``, ``phase2``,
-    ``phase3``) mas un resumen ``success`` por fase.
+    El log es un dict con entradas ``phase1``, ``phase2``, ``phase2_5``
+    mas un resumen ``success`` por fase.
     """
 
-    PHASES = ('HUSKY_CLEAR', 'ANYMAL_TRANSPORT', 'PUZZLEBOT_STACK', 'DONE')
-    STACK_ORDER = ('C', 'B', 'A')      # Apilar de abajo hacia arriba
-    ANYMAL_TARGET = (11.0, 3.6)
+    PHASES = ('HUSKY_CLEAR', 'ANYMAL_TRANSPORT', 'XARM_TRANSFER', 'DONE')
+    # Orden en que el xArm transfiere los PBs a la mesa
+    TRANSFER_ORDER = ('C', 'B', 'A')
+    # Destino del ANYmal: justo al sur del xArm, para que su reach de
+    # ~0.73 m cubra todo el dorso.
+    ANYMAL_TARGET = (11.5, 3.0)
 
-    def __init__(self,
-                 husky_terrain="grass",
-                 work_zone=None):
+    # Posiciones de las 3 plazas del dorso del ANYmal donde viajan los
+    # PuzzleBots. Offsets en marco del ANYmal (frente/atras, lateral, alto).
+    # Espaciado reducido a 0.22 m para que los 3 entren en el reach del xArm.
+    PB_ON_ANYMAL_OFFSETS = {
+        'C': (-0.22, 0.0, 0.30),
+        'B': ( 0.00, 0.0, 0.30),
+        'A': ( 0.22, 0.0, 0.30),
+    }
+    # Posiciones donde el xArm deposita cada PuzzleBot (en el piso, al
+    # norte del xArm, cerca de la mesa). Coinciden con el ``start_xy``
+    # con el que la fase 3 espera a los bots.
+    PB_TABLE_DROP = {
+        'C': (11.30, 3.65),
+        'B': (11.50, 3.65),
+        'A': (11.70, 3.65),
+    }
+    # Base del xArm 6 (fija, anclada al piso), entre el ANYmal y la mesa.
+    XARM_BASE_XY = (11.50, 3.35)
+    XARM_BASE_YAW = math.pi / 2.0
+
+    def __init__(self, husky_terrain="grass"):
         # --- Fase 1 ---
         self.husky = HuskyA200()
         self.husky.set_terrain(husky_terrain)
@@ -167,13 +103,16 @@ class MissionCoordinator:
         # --- Fase 2 ---
         self.anymal = ANYmal()
 
-        # --- Fase 3 ---
-        self.work_zone = work_zone or WorkZone()
-        # 3 PuzzleBots colocados en la zona de trabajo (los baja el ANYmal)
+        # --- Fase 2.5: xArm 6 fijo junto a la mesa ---
+        self.xarm = XArm(base_xy=self.XARM_BASE_XY,
+                         base_yaw=self.XARM_BASE_YAW)
+
+        # 3 PuzzleBots pasajeros: empiezan sobre el dorso del ANYmal y
+        # el xArm los baja a la mesa al final de la fase 2.5.
         self.units = [
-            PuzzleBotUnit('PB_C', 'C', start_xy=(11.20, 3.30)),
-            PuzzleBotUnit('PB_B', 'B', start_xy=(11.20, 3.60)),
-            PuzzleBotUnit('PB_A', 'A', start_xy=(11.20, 3.90)),
+            PuzzleBotUnit('PB_C', 'C', start_xy=self.PB_TABLE_DROP['C']),
+            PuzzleBotUnit('PB_B', 'B', start_xy=self.PB_TABLE_DROP['B']),
+            PuzzleBotUnit('PB_A', 'A', start_xy=self.PB_TABLE_DROP['A']),
         ]
 
         # Estado de la FSM
@@ -181,7 +120,7 @@ class MissionCoordinator:
         self.log = {
             'phase1': None,
             'phase2': None,
-            'phase3': None,
+            'phase2_5': None,
             'success': {},
         }
 
@@ -190,7 +129,7 @@ class MissionCoordinator:
         """Ejecuta las 3 fases en secuencia y retorna el log completo."""
         self.run_phase1()
         self.run_phase2()
-        self.run_phase3()
+        self.run_phase2_5()
         return self.log
 
     # ------------------------------------------------------------------
@@ -214,92 +153,73 @@ class MissionCoordinator:
         )
         self.log['phase2'] = log
         self.log['success']['phase2'] = bool(log['success'])
-        self.phase = 'PUZZLEBOT_STACK'
+        self.phase = 'XARM_TRANSFER'
         return log
 
-    def run_phase3(self):
-        """3 PuzzleBots apilan A-B-C en orden C, B, A (time-slotting)."""
-        assert self.phase == 'PUZZLEBOT_STACK'
-        units_log = []
-        for box_name in self.STACK_ORDER:
-            unit = next(u for u in self.units if u.role_box == box_name)
-            units_log.append(self._pick_and_place(unit, box_name))
+    def run_phase2_5(self):
+        """El xArm 6 baja los 3 PuzzleBots del dorso del ANYmal a la mesa.
 
-        all_placed = all(b.placed for b in self.work_zone.boxes.values())
-        ph3 = {
-            'order': list(self.STACK_ORDER),
-            'units': units_log,
-            'success': all_placed,
-            'final_box_positions': {
-                name: {'xy': b.xy.tolist(), 'z': b.z, 'placed': b.placed}
-                for name, b in self.work_zone.boxes.items()
-            },
-        }
-        self.log['phase3'] = ph3
-        self.log['success']['phase3'] = all_placed
-        self.phase = 'DONE'
-        return ph3
-
-    # ------------------------------------------------------------------
-    def _pick_and_place(self, unit, box_name):
-        """Sub-rutina pick & place para una unidad y una caja.
-
-        Pasos:
-            1. Manejar el PuzzleBot a un punto de approach junto a la caja.
-            2. Brazo: trayectoria cartesiana hasta agarrar la caja
-               (calcula tau = J^T f para el grip).
-            3. Manejar el PuzzleBot al punto de apilado.
-            4. Brazo: colocar la caja a la altura correspondiente del stack.
-            5. Marcar la caja como colocada y avanzar el contador.
+        El ANYmal ya llego a ``ANYMAL_TARGET``; los 3 PuzzleBots estan en
+        su dorso con offsets ``PB_ON_ANYMAL_OFFSETS``. El xArm hace 3
+        ciclos pick & place (orden C, B, A) llevando cada bot a su
+        ``PB_TABLE_DROP``.
         """
-        box = self.work_zone.boxes[box_name]
+        assert self.phase == 'XARM_TRANSFER'
+        # Pose final de la base del ANYmal
+        p2 = self.log['phase2']
+        ax, ay, ayaw = (p2['base_x'][-1], p2['base_y'][-1], p2['base_yaw'][-1])
 
-        # --- 1. Drive to box ---
-        # El PuzzleBot se posiciona ~0.12 m al oeste de la caja, encarando +x
-        approach_pick = np.array([box.xy[0] - 0.12, box.xy[1]])
-        drive_log_pick = drive_puzzlebot_to(unit.base, approach_pick)
+        units_log = []
+        all_ok = True
+        for role in self.TRANSFER_ORDER:
+            off = self.PB_ON_ANYMAL_OFFSETS[role]
+            # Pose del PuzzleBot sobre el ANYmal en marco mundo
+            cs, sn = math.cos(ayaw), math.sin(ayaw)
+            pick_x = ax + cs * off[0] - sn * off[1]
+            pick_y = ay + sn * off[0] + cs * off[1]
+            pick_z = off[2]
+            p_pick = np.array([pick_x, pick_y, pick_z])
 
-        # --- 2. Brazo: grasp ---
-        # Posicion de la caja en marco brazo: x = 0.12, y = 0, z = box.z
-        # (el brazo esta montado en el centro del bot, base a altura 0)
-        box_in_arm_frame = np.array([0.10, 0.0, box.z])
-        grasp_result = unit.arm.grasp_box(box_in_arm_frame,
-                                          grip_force=2.0,
-                                          n_steps=15)
+            # Destino en la mesa
+            drop = self.PB_TABLE_DROP[role]
+            # Altura de "apoyo" en la mesa (el bot tiene ~0.10 m de alto)
+            p_place = np.array([drop[0], drop[1], 0.10])
 
-        # --- 3. Drive to stack ---
-        approach_place = np.array([self.work_zone.stack_xy[0] - 0.12,
-                                   self.work_zone.stack_xy[1]])
-        drive_log_place = drive_puzzlebot_to(unit.base, approach_place)
+            # Trayectoria cartesiana del TCP y trayectoria articular via IK
+            cart_path = self.xarm.pick_place_cartesian_path(
+                p_pick, p_place, approach_height=0.15, n_seg=12)
+            q_path = self.xarm.joint_path_from_cartesian(cart_path)
 
-        # --- 4. Brazo: place ---
-        target_z = (self.work_zone.table_z
-                    + self.work_zone.stack_count * self.work_zone.layer_height)
-        place_pos = np.array([0.10, 0.0, target_z])
-        # Reseteamos el arm para que la trayectoria parta de su pose
-        # actual (post-grasp) hasta el punto de coloca.
-        place_result = unit.arm.grasp_box(place_pos,
-                                          grip_force=2.0,
-                                          n_steps=15)
+            # Indices notables del path (ver pick_place_cartesian_path):
+            # 0=home, n_seg=above_pick, 2n=pick, 3n=above_pick,
+            # 4n=above_place, 5n=place, 6n=above_place, 7n=home
+            n = 12
+            idx_grab = 2 * n     # PB queda enganchado al TCP
+            idx_release = 5 * n  # PB queda en la mesa
 
-        # --- 5. Actualizar la caja y la pila ---
-        box.xy = self.work_zone.stack_xy.copy()
-        box.z = target_z
-        box.placed = True
-        self.work_zone.stack_count += 1
+            # En la sim: el PB sigue al TCP entre [idx_grab, idx_release].
+            units_log.append({
+                'role': role,
+                'p_pick': p_pick.tolist(),
+                'p_place': p_place.tolist(),
+                'cart_path': cart_path,
+                'q_path': q_path,
+                'idx_grab': idx_grab,
+                'idx_release': idx_release,
+            })
+            # Dejamos el xArm en home para el siguiente ciclo
+            self.xarm.reset()
 
-        return {
-            'unit_name': unit.name,
-            'box': box_name,
-            'drive_pick': drive_log_pick,
-            'drive_place': drive_log_place,
-            'grasp': grasp_result,
-            'place': place_result,
-            'tau_grasp': grasp_result['tau_grip'].tolist(),
-            'tau_place': place_result['tau_grip'].tolist(),
-            'singular_grasp': bool(grasp_result['singular']),
-            'singular_place': bool(place_result['singular']),
+        self.log['phase2_5'] = {
+            'units': units_log,
+            'base_xy': tuple(self.XARM_BASE_XY),
+            'base_yaw': self.XARM_BASE_YAW,
+            'anymal_final': (ax, ay, ayaw),
+            'success': all_ok,
         }
+        self.log['success']['phase2_5'] = all_ok
+        self.phase = 'DONE'
+        return self.log['phase2_5']
 
 
 # ===========================================================================
@@ -325,10 +245,9 @@ if __name__ == "__main__":
     print(f"Fase 2 (ANYmal)  : error final={p2['final_error']:.3f} m, "
           f"violaciones det(J)={sum(p2['violations'].values())}")
 
-    p3 = log['phase3']
-    print(f"Fase 3 (PB stack): orden={p3['order']}, "
-          f"todas colocadas={p3['success']}")
-    for u in p3['units']:
-        print(f"   {u['unit_name']} -> caja {u['box']}: "
-              f"tau_grasp norm={np.linalg.norm(u['tau_grasp']):.4f}")
+    p25 = log['phase2_5']
+    print(f"Fase 2.5 (xArm)  : PBs transferidos={len(p25['units'])}, "
+          f"exito={p25['success']}")
+    for u in p25['units']:
+        print(f"   PB_{u['role']} pick={u['p_pick']} -> place={u['p_place']}")
     print(f"\nFase final: {coord.phase}")

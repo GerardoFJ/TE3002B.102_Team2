@@ -94,6 +94,49 @@ def _draw_puzzlebot(ax, mpatches, x, y, theta, side=0.20, color='#2ca02c'):
             color='yellow', markersize=3)
 
 
+def _draw_xarm(ax, mpatches, link_points_world, base_yaw,
+               base_radius=0.12, base_color='#333333'):
+    """Dibuja el xArm 6 en top-view: base + polilinea de eslabones.
+
+    ``link_points_world`` es el resultado de ``XArm.link_points_world()``:
+    5 puntos (base, hombro, codo, muneca, tcp) en el marco mundo.
+    Para el top-view proyectamos (x, y) y pintamos grosor proporcional
+    a la altura z para dar sensacion de elevacion.
+    """
+    pts = np.asarray(link_points_world)
+    xb, yb = pts[0, 0], pts[0, 1]
+
+    # Base (caja cuadrada fija anclada al piso)
+    base_side = 0.22
+    cs, sn = math.cos(base_yaw), math.sin(base_yaw)
+    corners_local = np.array([
+        [ base_side / 2,  base_side / 2],
+        [ base_side / 2, -base_side / 2],
+        [-base_side / 2, -base_side / 2],
+        [-base_side / 2,  base_side / 2],
+    ])
+    R = np.array([[cs, -sn], [sn, cs]])
+    corners = (R @ corners_local.T).T + np.array([xb, yb])
+    base_poly = mpatches.Polygon(corners, closed=True, facecolor=base_color,
+                                 edgecolor='black', linewidth=1.0, alpha=0.9)
+    ax.add_patch(base_poly)
+
+    # Eslabones como polilinea, proyeccion top-view (x, y)
+    xs = pts[:, 0]
+    ys = pts[:, 1]
+    # Eslabon 1 (base->hombro) es vertical puro, casi no aporta visual;
+    # lo marcamos como punto. Dibujamos brazo y antebrazo:
+    ax.plot(xs[1:4], ys[1:4], '-', color='#888888',
+            linewidth=4, alpha=0.9, solid_capstyle='round')
+    # Efector (TCP) como circulo rojo
+    ax.plot(pts[4, 0], pts[4, 1], 'o', color='#d62728',
+            markersize=6, markeredgecolor='black', zorder=5)
+    # Articulaciones (hombro, codo, muneca) como puntos negros
+    for i in (1, 2, 3):
+        ax.plot(pts[i, 0], pts[i, 1], 'o', color='black',
+                markersize=3.5, zorder=5)
+
+
 def _draw_box(ax, mpatches, cx, cy, side, color='#ff7f0e', label=None):
     """Dibuja una caja AABB centrada en (cx, cy) con half-side ``side``."""
     rect = mpatches.Rectangle((cx - side, cy - side), 2 * side, 2 * side,
@@ -147,8 +190,7 @@ class MissionVisualizer:
 
         frames = []
         # ----- Fase 1 -----
-        # El ANYmal aun no se mueve y carga los 3 PuzzleBots en su dorso
-        # (segun el reto). Posicion inicial: (0, 0, 0).
+        # El ANYmal aun no se mueve y carga los 3 PuzzleBots en su dorso.
         anymal_start = (0.0, 0.0, 0.0)
         pb_on_back = self._puzzlebots_on_anymal(*anymal_start)
         p1 = self.log['phase1']
@@ -161,8 +203,6 @@ class MissionVisualizer:
                 'puzzlebots': pb_on_back,
                 'big_boxes': {name: p1['boxes'][name][i]
                               for name in p1['boxes']},
-                'small_boxes': self._initial_small_boxes(),
-                'stack_count': 0,
             })
 
         # Posicion final de fase 1 (para arrancar fase 2)
@@ -180,102 +220,81 @@ class MissionVisualizer:
                 'puzzlebots': self._puzzlebots_on_anymal(
                     p2['base_x'][i], p2['base_y'][i], p2['base_yaw'][i]),
                 'big_boxes': last_big_boxes,
-                'small_boxes': self._initial_small_boxes(),
-                'stack_count': 0,
             })
 
         last_anymal = (p2['base_x'][-1], p2['base_y'][-1], p2['base_yaw'][-1])
 
-        # ----- Fase 3 -----
-        # Cada unidad tiene drive_pick + drive_place. Estado: 3 pb iniciales
-        # en (11.20, 3.30/3.60/3.90) + small boxes en su WorkZone.
-        p3 = self.log['phase3']
-        order = p3['order']                      # ['C', 'B', 'A']
-        wz = self.coord.work_zone
+        # ----- Fase 2.5: xArm transfiere los PBs del ANYmal a la mesa -----
+        p25 = self.log['phase2_5']
+        pb_world = self._puzzlebots_on_anymal(*last_anymal)
+        role_to_idx = {'C': 0, 'B': 1, 'A': 2}
 
-        # Estado inicial mutable para fase 3
-        pb_states = {  # role_box -> (x, y, theta)
-            'C': (11.20, 3.30, 0.0),
-            'B': (11.20, 3.60, 0.0),
-            'A': (11.20, 3.90, 0.0),
-        }
-        small_boxes_state = self._initial_small_boxes()
-        stack_count_state = 0
+        from .xarm import XArm  # import local para no tocar el top-level
+        xarm_vis = XArm(base_xy=p25['base_xy'], base_yaw=p25['base_yaw'])
 
-        for unit_log, role in zip(p3['units'], order):
-            # Driving pick
-            dp = unit_log['drive_pick']
-            for i in range(0, len(dp['t']), self.stride):
-                pb_states[role] = (dp['x'][i], dp['y'][i], dp['theta'][i])
+        for unit in p25['units']:
+            role = unit['role']
+            qs = unit['q_path']
+            idx_grab = unit['idx_grab']
+            idx_release = unit['idx_release']
+
+            for i in range(0, len(qs), max(1, self.stride // 2)):
+                xarm_vis.q = qs[i].copy()
+                links = xarm_vis.link_points_world()
+                tcp_xy = (links[4, 0], links[4, 1])
+
+                # El PB "activo" sigue al TCP mientras este agarrado
+                if idx_grab <= i < idx_release:
+                    pb_world[role_to_idx[role]] = (tcp_xy[0], tcp_xy[1], 0.0)
+                elif i >= idx_release:
+                    drop = self.coord.PB_TABLE_DROP[role]
+                    pb_world[role_to_idx[role]] = (drop[0], drop[1], 0.0)
+
                 frames.append({
-                    'phase': 3,
+                    'phase': 2.5,
                     'husky': last_husky,
                     'anymal': last_anymal,
-                    'puzzlebots': self._pb_state_to_list(pb_states),
+                    'puzzlebots': list(pb_world),
+                    'xarm_links': links.copy(),
+                    'xarm_base_yaw': p25['base_yaw'],
                     'big_boxes': last_big_boxes,
-                    'small_boxes': dict(small_boxes_state),
-                    'stack_count': stack_count_state,
                     'active': role,
                 })
-            # "Pick" instantaneo: la caja deja la mesa y queda con el bot
-            # (la dibujamos junto al PuzzleBot)
-            small_boxes_state[role] = (None, 'carried_by:' + role)
 
-            # Driving place
-            dp2 = unit_log['drive_place']
-            for i in range(0, len(dp2['t']), self.stride):
-                pb_states[role] = (dp2['x'][i], dp2['y'][i], dp2['theta'][i])
-                frames.append({
-                    'phase': 3,
-                    'husky': last_husky,
-                    'anymal': last_anymal,
-                    'puzzlebots': self._pb_state_to_list(pb_states),
-                    'big_boxes': last_big_boxes,
-                    'small_boxes': dict(small_boxes_state),
-                    'stack_count': stack_count_state,
-                    'active': role,
-                })
-            # "Place" instantaneo: la caja queda en la pila
-            stack_z = stack_count_state    # solo para etiqueta
-            small_boxes_state[role] = (
-                (wz.stack_xy[0], wz.stack_xy[1]),
-                f'stack:{stack_count_state}',
-            )
-            stack_count_state += 1
-            # Algunos frames "post-place" para que el ojo registre la pila
-            for _ in range(8):
-                frames.append({
-                    'phase': 3,
-                    'husky': last_husky,
-                    'anymal': last_anymal,
-                    'puzzlebots': self._pb_state_to_list(pb_states),
-                    'big_boxes': last_big_boxes,
-                    'small_boxes': dict(small_boxes_state),
-                    'stack_count': stack_count_state,
-                    'active': None,
-                })
+            # Estado final del PB depositado
+            drop = self.coord.PB_TABLE_DROP[role]
+            pb_world[role_to_idx[role]] = (drop[0], drop[1], 0.0)
+
+        # Frames finales "post-misión": PBs en la mesa, xArm en home.
+        home_links = self.coord.xarm.link_points_world(
+            self.coord.xarm.q_home)
+        for _ in range(15):
+            frames.append({
+                'phase': 2.5,
+                'husky': last_husky,
+                'anymal': last_anymal,
+                'puzzlebots': list(pb_world),
+                'xarm_links': home_links.copy(),
+                'xarm_base_yaw': self.coord.XARM_BASE_YAW,
+                'big_boxes': last_big_boxes,
+                'active': None,
+            })
 
         return frames
 
     # ------------------------------------------------------------------
-    def _initial_small_boxes(self):
-        wz = self.coord.work_zone
-        out = {}
-        for name, box in wz.boxes.items():
-            out[name] = ((float(box.xy[0]), float(box.xy[1])), 'on_table')
-        return out
-
-    def _pb_state_to_list(self, pb_states):
-        # PB_C, PB_B, PB_A en ese orden
-        return [pb_states['C'], pb_states['B'], pb_states['A']]
-
     def _puzzlebots_on_anymal(self, ax_, ay_, ayaw):
-        """Devuelve poses de los 3 PB cuando van encima del ANYmal."""
+        """Devuelve poses de los 3 PB cuando van encima del ANYmal.
+
+        Los offsets 2D se toman del coordinator (``PB_ON_ANYMAL_OFFSETS``)
+        para que coincidan con lo que espera el xArm en la fase 2.5.
+        Orden de salida: [C, B, A].
+        """
         cs, sn = math.cos(ayaw), math.sin(ayaw)
-        # 3 puntos a lo largo del eje longitudinal del ANYmal
-        offsets_local = [(-0.30, 0.0), (0.0, 0.0), (0.30, 0.0)]
         out = []
-        for lx, ly in offsets_local:
+        for role in ('C', 'B', 'A'):
+            off = self.coord.PB_ON_ANYMAL_OFFSETS[role]
+            lx, ly = off[0], off[1]
             wx = ax_ + cs * lx - sn * ly
             wy = ay_ + sn * lx + cs * ly
             out.append((wx, wy, ayaw))
@@ -283,7 +302,7 @@ class MissionVisualizer:
 
     # ------------------------------------------------------------------
     def _draw_static(self, ax, mpatches):
-        """Dibuja el corredor, la zona de trabajo y la pila destino."""
+        """Dibuja el corredor y la mesa donde descansaran los PuzzleBots."""
         ax.set_xlim(*self.xlim)
         ax.set_ylim(*self.ylim)
         ax.set_aspect('equal')
@@ -303,31 +322,30 @@ class MissionVisualizer:
         ax.text((c['xmin'] + c['xmax']) / 2, c['ymax'] + 0.15,
                 'Corredor 6x2', ha='center', fontsize=8)
 
-        # Zona de trabajo de fase 3 (mesa)
-        wz = self.coord.work_zone
-        xs = [b.xy[0] for b in wz.boxes.values()]
-        ys = [b.xy[1] for b in wz.boxes.values()]
-        x0 = min(xs) - 0.10
-        x1 = max(xs) + 0.10
-        y0 = min(ys) - 0.10
-        y1 = max(ys) + 0.10
+        # Mesa: rectangulo que cubre los 3 drops del xArm
+        drops = list(self.coord.PB_TABLE_DROP.values())
+        xs = [d[0] for d in drops]
+        ys = [d[1] for d in drops]
+        pad = 0.18
+        x0 = min(xs) - pad
+        x1 = max(xs) + pad
+        y0 = min(ys) - pad
+        y1 = max(ys) + pad
         table = mpatches.Rectangle((x0, y0), x1 - x0, y1 - y0,
                                    facecolor='#bcd9b3', edgecolor='black',
                                    linewidth=0.8, alpha=0.5)
         ax.add_patch(table)
-        ax.text((x0 + x1) / 2, y0 - 0.10, 'mesa cajas',
-                ha='center', fontsize=7)
-
-        # Marca de la pila destino
-        ax.plot(wz.stack_xy[0], wz.stack_xy[1], 'kx', markersize=8)
-        ax.text(wz.stack_xy[0] + 0.05, wz.stack_xy[1] + 0.05,
-                'pila', fontsize=7)
+        ax.text((x0 + x1) / 2, y1 + 0.08, 'mesa', ha='center', fontsize=8)
 
         # Marca del target del ANYmal
         ax.plot(*self.coord.ANYMAL_TARGET, 'r*', markersize=10)
         ax.text(self.coord.ANYMAL_TARGET[0] + 0.10,
                 self.coord.ANYMAL_TARGET[1],
                 'p_destino', fontsize=7, color='red')
+
+        # Etiqueta de la base del xArm
+        xb, yb = self.coord.XARM_BASE_XY
+        ax.text(xb, yb - 0.20, 'xArm 6', ha='center', fontsize=8)
 
     # ------------------------------------------------------------------
     def _draw_frame(self, frame, ax, mpatches, title_text):
@@ -349,30 +367,19 @@ class MissionVisualizer:
         ax_, ay_, ath = frame['anymal']
         _draw_anymal(ax, mpatches, ax_, ay_, ath)
 
+        # xArm 6 (siempre visible; en fase 2.5 usa links animados, en el
+        # resto se dibuja en pose home usando el xarm del coordinator).
+        if 'xarm_links' in frame:
+            _draw_xarm(ax, mpatches, frame['xarm_links'],
+                       frame.get('xarm_base_yaw', self.coord.XARM_BASE_YAW))
+        else:
+            home_links = self.coord.xarm.link_points_world(
+                self.coord.xarm.q_home)
+            _draw_xarm(ax, mpatches, home_links, self.coord.XARM_BASE_YAW)
+
         # PuzzleBots
         for (px, py, pth) in frame['puzzlebots']:
             _draw_puzzlebot(ax, mpatches, px, py, pth)
-
-        # Cajas pequenas
-        small_side = 0.04   # 4 cm visibles, > el side fisico, para legibilidad
-        for name, (pos, status) in frame['small_boxes'].items():
-            if status == 'on_table':
-                cx, cy = pos
-                _draw_box(ax, mpatches, cx, cy, small_side,
-                          color='#e377c2', label=name)
-            elif status.startswith('carried_by'):
-                # Dibujar pegada al PB activo (si existe)
-                role = status.split(':', 1)[1]
-                idx = {'C': 0, 'B': 1, 'A': 2}[role]
-                px, py, _ = frame['puzzlebots'][idx]
-                _draw_box(ax, mpatches, px + 0.10, py, small_side,
-                          color='#e377c2', label=name)
-            elif status.startswith('stack'):
-                cx, cy = pos
-                # Pequeno offset vertical visual segun la capa
-                layer = int(status.split(':', 1)[1])
-                _draw_box(ax, mpatches, cx, cy + 0.04 * layer, small_side,
-                          color='#e377c2', label=name)
 
         ax.set_title(title_text, fontsize=10)
 
@@ -389,9 +396,9 @@ class MissionVisualizer:
         self._draw_static(ax, mpatches)
 
         phase_titles = {
-            1: "Fase 1: Husky despeja el corredor",
-            2: "Fase 2: ANYmal trota al destino con 3 PuzzleBots",
-            3: "Fase 3: PuzzleBots apilan cajas (orden C, B, A)",
+            1:   "Fase 1: Husky despeja el corredor",
+            2:   "Fase 2: ANYmal trota al destino con 3 PuzzleBots",
+            2.5: "Fase 2.5: xArm 6 baja los PuzzleBots a la mesa",
         }
 
         def update(idx):
