@@ -2,3 +2,5 @@ Opencv_Env/
 dataset_cleaned/
 backgrounds/
 dataset_segmented/
+runs/
+dataset_ultra/

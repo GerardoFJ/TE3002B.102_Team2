@@ -1,6 +1,6 @@
 from ultralytics import YOLO
 
-model = YOLO("yolov26s.pt")   # nano 
+model = YOLO("yolo26s.pt")   # nano 
 
 # Entrenar
 results = model.train(

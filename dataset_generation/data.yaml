@@ -1,4 +1,4 @@
-path: /home/luxfero/Documents/dataset_generator/dataset_ultra
+path: /TE3002B.102_Team2/dataset_generation/dataset_ultra
 train: images/train
 val: images/eval
 
