@@ -46,7 +46,12 @@ def segment_sign(img_pil: Image.Image, text_prompt: str) -> np.ndarray | None:
         images=img_pil,
         text=text_prompt,
         return_tensors="pt",
-    ).to(device, dtype=torch.bfloat16)
+    )
+    # Mover a device: tensores float → bfloat16, enteros (text tokens) → sin castear
+    inputs = {
+        k: v.to(device, dtype=torch.bfloat16) if v.is_floating_point() else v.to(device)
+        for k, v in inputs.items()
+    }
 
     with torch.no_grad():
         outputs = model(**inputs)
@@ -73,14 +78,13 @@ def segment_sign(img_pil: Image.Image, text_prompt: str) -> np.ndarray | None:
     return mask
 
 
-def save_results(folder, img_pil: Image.Image, mask: np.ndarray, base_name: str) -> None:
-    img_np = np.array(img_pil)
+def save_results(folder: str, img_pil: Image.Image, mask: np.ndarray, base_name: str) -> None:
+    out_folder = os.path.join(OUTPUT_DIR, folder)
+    os.makedirs(out_folder, exist_ok=True)
 
-    # PNG con canal alpha (fondo transparente)
+    img_np = np.array(img_pil)
     rgba = np.dstack([img_np, mask]).astype(np.uint8)
-    Image.fromarray(rgba, "RGBA").save(
-        os.path.join(OUTPUT_DIR,folder, f"{base_name}.png")
-    )
+    Image.fromarray(rgba, "RGBA").save(os.path.join(out_folder, f"{base_name}.png"))
 
 def check_blur(img: Image.Image, threshold: float = 100.0) -> bool:
     gray = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
@@ -104,7 +108,8 @@ for folder in folders:
 
     for fname in image_files:
         base_name = os.path.splitext(fname)[0]
-        prompt    = PROMPTS.get(base_name, DEFAULT_PROMPT)
+        # Usar el nombre del folder (clase) como prompt, no el nombre del archivo
+        prompt    = PROMPTS.get(folder, DEFAULT_PROMPT)
         print(f"  [{base_name}] prompt='{prompt}'", end=" ", flush=True)
 
         img  = Image.open(os.path.join(IMAGES_DIR, folder ,fname)).convert("RGB")
