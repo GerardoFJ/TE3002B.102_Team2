@@ -8,8 +8,8 @@ import cv2
 from transformers import Sam3Processor, Sam3Model
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-IMAGES_DIR = os.path.join(SCRIPT_DIR, "Test_images")
-OUTPUT_DIR = os.path.join(SCRIPT_DIR, "segmented")
+IMAGES_DIR = os.path.join(SCRIPT_DIR, "dataset_cleaned")
+OUTPUT_DIR = os.path.join(SCRIPT_DIR, "dataset_segmented")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -73,54 +73,53 @@ def segment_sign(img_pil: Image.Image, text_prompt: str) -> np.ndarray | None:
     return mask
 
 
-def save_results(img_pil: Image.Image, mask: np.ndarray, base_name: str) -> None:
+def save_results(folder, img_pil: Image.Image, mask: np.ndarray, base_name: str) -> None:
     img_np = np.array(img_pil)
 
     # PNG con canal alpha (fondo transparente)
     rgba = np.dstack([img_np, mask]).astype(np.uint8)
     Image.fromarray(rgba, "RGBA").save(
-        os.path.join(OUTPUT_DIR, f"{base_name}.png")
+        os.path.join(OUTPUT_DIR,folder, f"{base_name}.png")
     )
 
-    # Máscara binaria
-    Image.fromarray(mask).save(
-        os.path.join(OUTPUT_DIR, f"{base_name}_mask.png")
-    )
-
-    # Imagen de comparación: original | máscara overlay
-    overlay = img_np.copy()
-    overlay[mask == 0] = (overlay[mask == 0] * 0.25).astype(np.uint8)
-    comparison = np.hstack([img_np, overlay])
-    Image.fromarray(comparison).save(
-        os.path.join(OUTPUT_DIR, f"{base_name}_comparison.png")
-    )
+def check_blur(img: Image.Image, threshold: float = 100.0) -> bool:
+    gray = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
+    fm = cv2.Laplacian(gray, cv2.CV_64F).var()
+    return fm < threshold
 
 
 # ── Procesar todas las imágenes ──────────────────────────────────────────────
-extensions = (".png", ".jpg", ".jpeg")
-image_files = sorted(
-    f for f in os.listdir(IMAGES_DIR) if f.lower().endswith(extensions)
-)
 
-print(f"Procesando {len(image_files)} imágenes...\n")
+folders = [f for f in os.listdir(IMAGES_DIR) if os.path.isdir(os.path.join(IMAGES_DIR,f))]
+print(f"Labels to be segmented {folders}")
 
-for fname in image_files:
-    base_name = os.path.splitext(fname)[0]
-    prompt    = PROMPTS.get(base_name, DEFAULT_PROMPT)
-    print(f"  [{base_name}] prompt='{prompt}'", end=" ", flush=True)
+for folder in folders:
+    print(f"====SEGMENTING {folder} ====")
+    extensions = (".png", ".jpg", ".jpeg")
+    image_files = sorted(
+        f for f in os.listdir(IMAGES_DIR+f'/{folder}') if f.lower().endswith(extensions)
+    )
 
-    img  = Image.open(os.path.join(IMAGES_DIR, fname)).convert("RGB")
-    mask = segment_sign(img, prompt)
+    print(f"Procesando {len(image_files)} imágenes...\n")
 
-    if mask is None:
-        print("⚠ SAM3 no encontró objetos — prueba con otro prompt")
-        continue
+    for fname in image_files:
+        base_name = os.path.splitext(fname)[0]
+        prompt    = PROMPTS.get(base_name, DEFAULT_PROMPT)
+        print(f"  [{base_name}] prompt='{prompt}'", end=" ", flush=True)
 
-    save_results(img, mask, base_name)
-    fg_pct = np.count_nonzero(mask) / mask.size * 100
-    print(f"foreground={fg_pct:.1f}%  ✓")
+        img  = Image.open(os.path.join(IMAGES_DIR, folder ,fname)).convert("RGB")
+        if check_blur(img):
+            print("Image blurred continuing with another")
+            continue
+
+        mask = segment_sign(img, prompt)
+
+        if mask is None:
+            print("⚠ SAM3 no encontró objetos — prueba con otro prompt")
+            continue
+
+        save_results(folder,img, mask, base_name)
+        fg_pct = np.count_nonzero(mask) / mask.size * 100
+        print(f"foreground={fg_pct:.1f}%  ✓")
 
 print(f"\nResultados guardados en: {OUTPUT_DIR}/")
-print("  <nombre>.png             → imagen con fondo transparente (RGBA)")
-print("  <nombre>_mask.png        → máscara binaria")
-print("  <nombre>_comparison.png  → comparación visual")
