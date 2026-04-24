@@ -82,9 +82,16 @@ def save_results(folder: str, img_pil: Image.Image, mask: np.ndarray, base_name:
     out_folder = os.path.join(OUTPUT_DIR, folder)
     os.makedirs(out_folder, exist_ok=True)
 
+    ys, xs = np.where(mask > 0)
+    if ys.size == 0 or xs.size == 0:
+        return
+    y0, y1 = ys.min(), ys.max() + 1
+    x0, x1 = xs.min(), xs.max() + 1
+
     img_np = np.array(img_pil)
     rgba = np.dstack([img_np, mask]).astype(np.uint8)
-    Image.fromarray(rgba, "RGBA").save(os.path.join(out_folder, f"{base_name}.png"))
+    cropped = rgba[y0:y1, x0:x1]
+    Image.fromarray(cropped, "RGBA").save(os.path.join(out_folder, f"{base_name}.png"))
 
 def check_blur(img: Image.Image, threshold: float = 100.0) -> bool:
     gray = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2GRAY)
