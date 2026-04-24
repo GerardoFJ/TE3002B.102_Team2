@@ -1,0 +1,11 @@
+path: /home/luxfero/Documents/dataset_generator/dataset_ultra
+train: images/train
+val: images/eval
+
+nc: 5 
+names:
+  - away
+  - direction
+  - stop
+  - straight
+  - workers
