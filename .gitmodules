@@ -1,0 +1,6 @@
+[submodule "Control_Module/InClass2/quadruped-optimal-control"]
+	path = Control_Module/InClass2/quadruped-optimal-control
+	url = https://github.com/nezih-niegu/quadruped-optimal-control.git
+[submodule "Control_Module/InClass3/quadruped-optimal-control"]
+	path = Control_Module/InClass3/quadruped-optimal-control
+	url = https://github.com/Danie-Hinojosa/quadruped-optimal-control.git
