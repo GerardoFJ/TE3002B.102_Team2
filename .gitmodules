@@ -4,3 +4,6 @@
 [submodule "Control_Module/InClass3/quadruped-optimal-control"]
 	path = Control_Module/InClass3/quadruped-optimal-control
 	url = https://github.com/Danie-Hinojosa/quadruped-optimal-control.git
+[submodule "Control_Module/Visual_Servoing/home2"]
+	path = Control_Module/Visual_Servoing/home2
+	url = https://github.com/RoBorregos/home2.git
