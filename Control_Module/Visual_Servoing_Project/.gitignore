@@ -1,0 +1,21 @@
+# Runtime artifacts produced on the orin (never commit these — they're
+# captured per-session against the live arm and are not portable).
+goal_pose.yaml
+align_target.yaml
+approach_target.yaml
+handeye_samples*.json
+
+# URDF backups written by apply_to_urdf.py
+*.xacro.bak
+*.xacro.*.bak
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Editor scratch
+*.swp
+*.swo
+.DS_Store
