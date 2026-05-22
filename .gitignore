@@ -4,3 +4,6 @@ backgrounds/
 dataset_segmented/
 runs/
 dataset_ultra/
+build/
+install/
+log/
