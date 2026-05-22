@@ -1,0 +1,36 @@
+import rclpy, threading, cv2
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+from flask import Flask, Response
+
+app = Flask(__name__)
+bridge = CvBridge()
+latest_frame = None
+
+class CamNode(Node):
+    def __init__(self):
+        super().__init__('cam_viewer')
+        self.create_subscription(Image, '/video_source/raw', self.cb, 10)
+
+    def cb(self, msg):
+        global latest_frame
+        latest_frame = bridge.imgmsg_to_cv2(msg, 'bgr8')
+
+def gen():
+    while True:
+        if latest_frame is not None:
+            _, buf = cv2.imencode('.jpg', latest_frame)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buf.tobytes() + b'\r\n')
+
+@app.route('/video')
+def video():
+    return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def ros_spin(node):
+    rclpy.spin(node)
+
+rclpy.init()
+node = CamNode()
+threading.Thread(target=ros_spin, args=(node,), daemon=True).start()
+app.run(host='0.0.0.0', port=5000)

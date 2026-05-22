@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Cyclone DDS config tuned for the Puzzlebot Jetson camera pipeline.
+
+  Key choices:
+    - Pinned to wlan0 explicitly. Without this, Cyclone autoselects an
+      interface and on the Jetson can pick a DOWN one (eth0, l4tbr0,
+      usb0, docker0). Forcing wlan0 keeps discovery + traffic on the
+      Wi-Fi that consumers actually live on.
+    - 10 MB UDP socket buffers (requires net.core.rmem_max/wmem_max=10MB,
+      persisted in /etc/sysctl.d/60-cyclonedds.conf).
+    - FragmentSize raised so each ~2.7 MB raw Image needs far fewer
+      fragments and the IP stack does fewer per-packet passes.
+    - Multicast on so any wlan0 consumer auto-discovers the camera.
+      If the AP drops multicast, change AllowMulticast to "spdp".
+-->
+<CycloneDDS xmlns="https://cdds.io/config"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="https://cdds.io/config
+              https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <Domain id="any">
+    <General>
+      <Interfaces>
+        <NetworkInterface name="wlan0"/>
+      </Interfaces>
+      <AllowMulticast>true</AllowMulticast>
+      <MaxMessageSize>65500B</MaxMessageSize>
+      <FragmentSize>65000B</FragmentSize>
+    </General>
+    <Internal>
+      <SocketReceiveBufferSize min="10MB"/>
+      <SocketSendBufferSize    min="10MB"/>
+    </Internal>
+  </Domain>
+</CycloneDDS>
