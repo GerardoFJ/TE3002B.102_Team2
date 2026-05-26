@@ -7,3 +7,6 @@
 [submodule "Control_Module/InClass4/auv_ftc_ws"]
 	path = Control_Module/InClass4/auv_ftc_ws
 	url = https://github.com/Danie-Hinojosa/auv_ftc_ws.git
+[submodule "Control_Module/InClass5/ros2_flatland_rl_tutorial"]
+	path = Control_Module/InClass5/ros2_flatland_rl_tutorial
+	url = https://github.com/Danie-Hinojosa/ros2_flatland_rl_tutorial.git
