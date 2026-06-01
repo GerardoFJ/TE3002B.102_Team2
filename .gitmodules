@@ -10,3 +10,6 @@
 [submodule "Control_Module/InClass5/ros2_flatland_rl_tutorial"]
 	path = Control_Module/InClass5/ros2_flatland_rl_tutorial
 	url = https://github.com/Danie-Hinojosa/ros2_flatland_rl_tutorial.git
+[submodule "Control_Module/InClass6/anymal_d_ppo"]
+	path = Control_Module/InClass6/anymal_d_ppo
+	url = https://github.com/Danie-Hinojosa/anymal_d_ppo.git
