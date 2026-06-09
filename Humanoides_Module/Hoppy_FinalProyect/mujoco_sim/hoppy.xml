@@ -1,0 +1,176 @@
+<mujoco model="HOPPY-E0">
+  <!-- ============================================================= -->
+  <!--  HOPPY: monoped on a planarizing gantry (boom).               -->
+  <!--  Kinematic tree from HOPPY-E0-final.urdf (SolidWorks export).  -->
+  <!--                                                                -->
+  <!--  DoF map (rubrica Fase 1.1):                                   -->
+  <!--    joint1 -> yaw    : gantry, PASSIVE  (boom sweep about tower) -->
+  <!--    joint2 -> pitch  : gantry, PASSIVE  (vertical hop DoF)      -->
+  <!--    joint3 -> hip    : leg,    ACTIVE                           -->
+  <!--    joint4 -> knee   : leg,    ACTIVE  (+ parallel spring)      -->
+  <!--  base_link is the central tower: rigidly fixed to the world.   -->
+  <!--  Geometry is the FAITHFUL SolidWorks/URDF export: the leg swings -->
+  <!--  in the boom's TANGENTIAL-vertical plane (hip/knee axes ~perp to -->
+  <!--  pitch), so pushing off drives the passive yaw -> HOPPY HOPS     -->
+  <!--  FORWARD, lapping the tower (its real locomotion). yaw is made    -->
+  <!--  continuous (no range) and v_des sets the cruise speed (~1 lap/   -->
+  <!--  9 s, rubrica Fase 4.4). Raise joint1 damping to brake -> in place.-->
+  <!-- ============================================================= -->
+
+  <compiler angle="radian" meshdir="meshes" autolimits="true"/>
+
+  <!-- ====================== MOTOR PARAMETERS ====================== -->
+  <!-- Physical motor: goBILDA 5202 series (RS-555 + planetary box).   -->
+  <!-- HOPPY runs the SAME motor on hip & knee but with DIFFERENT gear -->
+  <!-- ratios (CAD: 5202-..-0027). Authoritative constants are taken   -->
+  <!-- from the HOPPY reference model (Simulator_MATLAB/get_params.m),  -->
+  <!-- which the rubrica (1.2) mandates: N_H = 26.9, N_K = 28.8.        -->
+  <!--                                                                 -->
+  <!--   Gear ratio   N_H = 26.9 (hip),  N_K = 28.8 (knee)            -->
+  <!--   Rotor inertia I_r = 7e-6 kg m^2  (HOPPY measured value)       -->
+  <!--   Coil R = 1.30 ohm,  kT = 0.0135 N m/A,  kv = 0.0186 V s/rad   -->
+  <!--   Limits  V <= 12 V,  I <= 30 A  (stall torque ~3.3 N m/joint)  -->
+  <!--                                                                 -->
+  <!--   Reflected rotor inertia (armature)  I_ref = N^2 * I_r:        -->
+  <!--     hip : 26.9^2 * 7e-6 = 5.065e-3 kg m^2                       -->
+  <!--     knee: 28.8^2 * 7e-6 = 5.806e-3 kg m^2                       -->
+  <!--   Dissipation (rubrica 1.3) is split into its 3 named effects:  -->
+  <!--     - back-EMF  b = kv*kT*N^2/R  (0.140 hip / 0.160 knee):      -->
+  <!--       modeled EXPLICITLY by the voltage actuator in the brain   -->
+  <!--       (tau->V->i->tau); NOT duplicated as joint damping.        -->
+  <!--     - gearbox viscous loss -> joint damping = 0.02              -->
+  <!--     - gearbox Coulomb friction -> frictionloss = 0.10           -->
+  <!--   torque saturation: V<=12 V & I<=30 A bound tau to ~3.4 N m;   -->
+  <!--     an explicit clip at tau_max=3.73 N m closes Fase 2.1.       -->
+  <!--   encoder = 751.8 PPR out * 4 (quad) -> 2.086e-3 rad/count     -->
+  <!--   yaw/pitch: passive gantry boom bearings, friction damping 0.2 -->
+  <!--   Knee parallel spring: k = 30 N m/rad, rest = +0.30 rad        -->
+  <!--   (stores/releases hop energy, rubrica 1.4)                     -->
+  <!--   Leg geometry is the FAITHFUL URDF export (Link3/Link4 frames   -->
+  <!--   and meshes untouched) -> tangential swing -> forward travel.   -->
+  <!-- ============================================================== -->
+
+  <default>
+    <default class="hoppy">
+      <geom contype="0" conaffinity="0" group="2" type="mesh" rgba="0.85 0.85 0.88 1"/>
+      <joint type="hinge" frictionloss="0.0"/>
+      <default class="gantry">         <!-- passive yaw / pitch -->
+        <!-- boom-bearing viscous friction (rubrica 1.3). Yaw is the forward -->
+        <!-- travel DoF; this damping just keeps it smooth, not locked.       -->
+        <joint damping="0.2"/>
+      </default>
+      <default class="leg">            <!-- active hip / knee: see MOTOR block -->
+        <!-- damping = gearbox VISCOUS loss only (back-EMF is in the voltage    -->
+        <!-- actuator, so it is not double-counted here); frictionloss = Coulomb -->
+        <joint damping="0.02" frictionloss="0.10"/>  <!-- armature per joint -->
+      </default>
+      <default class="foot">          <!-- point contact -->
+        <geom contype="1" conaffinity="1" group="3" type="sphere" size="0.012"
+              rgba="0.1 0.1 0.1 1" friction="0.9 0.02 0.001"
+              solref="0.004 1" solimp="0.95 0.99 0.001"/>
+      </default>
+    </default>
+  </default>
+
+  <asset>
+    <mesh name="base_link" file="base_link.STL"/>
+    <mesh name="Link1"     file="Link1.STL"/>
+    <mesh name="Link2"     file="Link2.STL"/>
+    <mesh name="Link3"     file="Link3.STL"/>
+    <mesh name="Link4"     file="Link4.STL"/>
+  </asset>
+
+  <worldbody>
+    <!-- base_link: central tower, fixed to world -->
+    <body name="base_link" childclass="hoppy">
+      <geom mesh="base_link"/>
+
+      <!-- joint1: YAW (passive gantry rotation about vertical) = the FORWARD   -->
+      <!-- TRAVEL DoF. Made CONTINUOUS (no range limit) so HOPPY can lap the     -->
+      <!-- tower endlessly (the URDF's ±180° was a SolidWorks export default     -->
+      <!-- that stopped it half-way). `v_des` (controller) sets forward speed;   -->
+      <!-- raise this joint's damping to a yaw brake (~18) to hop ~in place.     -->
+      <body name="Link1" pos="0 0 0.04">
+        <inertial pos="1.19035e-06 -7.23296e-08 0.110977"
+                  quat="0.999539 -3.72317e-07 -1.22626e-05 -0.0303481"
+                  mass="1.05189" diaginertia="0.0015755 0.00119525 0.000930447"/>
+        <joint name="yaw" class="gantry" axis="0 0 1" limited="false"/>
+        <geom mesh="Link1"/>
+
+        <!-- joint2: PITCH (passive gantry elevation -> hop height) -->
+        <body name="Link2" pos="-0.00227444 -0.037431 0.21"
+              quat="0.705252 0.707058 0.00831865 -0.0511876">
+          <inertial pos="-0.513966 0.0016327 -0.00902703"
+                    quat="0.500001 0.500001 0.499999 0.499999"
+                    mass="1.87654" diaginertia="0.0636508 0.0630427 0.00259304"/>
+          <joint name="pitch" class="gantry" axis="0 0 1" range="-0.5 0.5"/>
+          <geom mesh="Link2"/>
+
+          <!-- COUNTERWEIGHT (rubrica 1.1): rigid mass on the +x boom tip,    -->
+          <!-- opposite the leg. Full static balance about pitch = 3.40 kg;   -->
+          <!-- we use ~70% (2.4 kg) so a net "body weight" remains and the    -->
+          <!-- monoped actually falls/hops. TUNABLE: justify in your report.  -->
+          <body name="counterweight" pos="0.39 0 -0.038">
+            <geom name="cw" type="box" size="0.035 0.035 0.035" mass="2.4"
+                  contype="0" conaffinity="0" group="2" rgba="0.20 0.20 0.25 1"/>
+          </body>
+
+          <!-- joint3: HIP (active) — FAITHFUL URDF geometry (no re-orient) -->
+          <body name="Link3" pos="-0.6585 0 0.0425"
+                quat="0.677009 -0.204104 -0.677009 0.204104">
+            <inertial pos="0.00864428 -0.0327981 0.0561207"
+                      quat="0.511267 0.498647 -0.497438 0.492456"
+                      mass="0.332207" diaginertia="0.000345397 0.000299821 7.12146e-05"/>
+            <joint name="hip" class="leg" axis="0 0 1" range="-0.5 0.9"
+                   armature="0.005065"/>
+            <geom mesh="Link3"/>
+
+            <!-- joint4: KNEE (active + parallel spring) — FAITHFUL URDF -->
+            <body name="Link4" pos="0 -0.1 0.0095"
+                  quat="0 -0.288647 -0.957436 0">
+              <inertial pos="-0.0162703 -0.0747425 -0.0260399"
+                        quat="0.285014 0.647037 -0.285746 0.646884"
+                        mass="0.172793" diaginertia="0.000170791 0.000165707 3.2109e-05"/>
+              <joint name="knee" class="leg" axis="0 0 -1" range="-1.3 0.4"
+                     armature="0.005806" stiffness="30" springref="0.30"/>
+              <geom mesh="Link4" rgba="0.75 0.75 0.75 1"/>
+
+              <geom name="foot" class="foot" pos="0.0229 -0.1824 -0.0275"/>
+              <site name="foot" pos="0.0229 -0.1824 -0.0275" size="0.02" rgba="1 0 0 0.4"/>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- ====================== ACTUATORS ============================= -->
+  <!-- Direct torque (motor) on the two active leg joints; gantry     -->
+  <!-- yaw/pitch are passive (no actuator). forcerange = torque sat.  -->
+  <actuator>
+    <motor name="hip"  joint="hip"  ctrlrange="-3.73 3.73" forcerange="-3.73 3.73"/>
+    <motor name="knee" joint="knee" ctrlrange="-3.73 3.73" forcerange="-3.73 3.73"/>
+  </actuator>
+
+  <!-- ====================== SENSORS =============================== -->
+  <!-- HOPPY's real sensor suite (Technical Guideline sec. VIII):       -->
+  <!--  * jointpos/jointvel = the two incremental ENCODERS (hip, knee), -->
+  <!--    consumed through EncoderEstimator (Fase 5.1).                  -->
+  <!--  * foot_touch = the FOOT CONTACT SENSOR (CAD: Linear_Disp_Sensor  -->
+  <!--    404R1KL1.0, a 1-inch linear potentiometer on the shank). This  -->
+  <!--    touch sensor gives the contact force the FootContactSensor     -->
+  <!--    turns into the foot displacement + binary contact switch that  -->
+  <!--    drives touchdown/lift-off (Fase 3.2 / Fase 5).                 -->
+  <!--  * foot_pos/foot_vel = Cartesian foot frame (Fase 4).            -->
+  <sensor>
+    <jointpos name="yaw_pos"   joint="yaw"/>
+    <jointpos name="pitch_pos" joint="pitch"/>
+    <jointpos name="hip_pos"   joint="hip"/>
+    <jointpos name="knee_pos"  joint="knee"/>
+    <jointvel name="hip_vel"   joint="hip"/>
+    <jointvel name="knee_vel"  joint="knee"/>
+    <touch    name="foot_touch" site="foot"/>   <!-- foot contact sensor input -->
+    <framepos     name="foot_pos"  objtype="site" objname="foot"/>
+    <framelinvel  name="foot_vel"  objtype="site" objname="foot"/>
+  </sensor>
+</mujoco>

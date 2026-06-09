@@ -1,0 +1,9 @@
+# Entorno virtual y cachés (nunca se commitean)
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivos temporales de MuJoCo
+MJDATA.TXT
+cyclonedds.log

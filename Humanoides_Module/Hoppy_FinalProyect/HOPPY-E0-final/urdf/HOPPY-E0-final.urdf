@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="HOPPY-E0-final">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-2.22044604925031E-16 2.22044604925031E-16 0.0166702186685954"
+        rpy="0 0 0" />
+      <mass
+        value="0.384124731516097" />
+      <inertia
+        ixx="0.000672971196790525"
+        ixy="-2.26750719979976E-19"
+        ixz="-1.73448497503738E-19"
+        iyy="0.000672971196790525"
+        iyz="3.27058617239314E-19"
+        izz="0.00117890270638154" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="Link1">
+    <inertial>
+      <origin
+        xyz="1.19034530232653E-06 -7.23296036397869E-08 0.110976967027509"
+        rpy="0 0 0" />
+      <mass
+        value="1.05188637341997" />
+      <inertia
+        ixx="0.00157409752553005"
+        ixy="-2.30264901563404E-05"
+        ixz="1.57979804128911E-08"
+        iyy="0.00119664916196974"
+        iyz="-9.61520238559879E-10"
+        izz="0.000930447203472101" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/Link1.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint1"
+    type="revolute">
+    <origin
+      xyz="0 0 0.0400000000000003"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Link1" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-3.14"
+      upper="3.14"
+      effort="10"
+      velocity="10" />
+  </joint>
+  <link
+    name="Link2">
+    <inertial>
+      <origin
+        xyz="-0.513965698728862 0.00163269882169459 -0.00902702628387808"
+        rpy="0 0 0" />
+      <mass
+        value="1.87653564029707" />
+      <inertia
+        ixx="0.00259304289792656"
+        ixy="2.30641489525691E-07"
+        ixz="-5.30325995302201E-08"
+        iyy="0.063650816029348"
+        iyz="-2.09929753044557E-08"
+        izz="0.0630426597842459" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/Link2.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint2"
+    type="revolute">
+    <origin
+      xyz="-0.0022744379377535 -0.0374309622113542 0.209999999999982"
+      rpy="1.57079632679489 0.0842181705579344 -0.0606889258397237" />
+    <parent
+      link="Link1" />
+    <child
+      link="Link2" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.5"
+      upper="0.5"
+      effort="10"
+      velocity="10" />
+  </joint>
+  <link
+    name="Link3">
+    <inertial>
+      <origin
+        xyz="0.00864427677405932 -0.0327980729698124 0.0561207403472103"
+        rpy="0 0 0" />
+      <mass
+        value="0.332207029889933" />
+      <inertia
+        ixx="0.00029976944437507"
+        ixy="-3.99833421422015E-06"
+        ixz="9.4651821935288E-07"
+        iyy="7.13012720864306E-05"
+        iyz="2.12558330641571E-06"
+        izz="0.000345362348054635" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/Link3.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/Link3.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint3"
+    type="revolute">
+    <origin
+      xyz="-0.658499999999595 0 0.0425000000006841"
+      rpy="-1.57079632679491 -0.98517045994532 1.57079632679491" />
+    <parent
+      link="Link2" />
+    <child
+      link="Link3" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.5"
+      upper="0.9"
+      effort="10"
+      velocity="10" />
+  </joint>
+  <link
+    name="Link4">
+    <inertial>
+      <origin
+        xyz="-0.0162702842654479 -0.0747424597836208 -0.026039892533797"
+        rpy="0 0 0" />
+      <mass
+        value="0.172792936147547" />
+      <inertia
+        ixx="0.000104974452802714"
+        ixy="6.65227528700312E-05"
+        ixz="5.43245619386452E-08"
+        iyy="9.28412398234489E-05"
+        iyz="-6.59932494517203E-08"
+        izz="0.000170790486199081" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/Link4.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://HOPPY-E0-final/meshes/Link4.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="joint4"
+    type="revolute">
+    <origin
+      xyz="0 -0.1 0.00950000000000006"
+      rpy="-3.14159265358979 0 2.55596678674021" />
+    <parent
+      link="Link3" />
+    <child
+      link="Link4" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-1.3"
+      upper="0.4"
+      effort="10"
+      velocity="10" />
+  </joint>
+</robot>
