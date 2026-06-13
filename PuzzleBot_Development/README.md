@@ -103,13 +103,6 @@ line is detected cleanly, press `s` to save the params.
 
 ---
 
-## `report/`
-
-LaTeX project report (Spanish) with the full technical write-up and figures
-generated from a real validation run. Build with `tectonic`:
-`cd report && tectonic -X compile main.tex`. The raw rosbag lives in
-`archive/papupapu2/`.
-
 ## `archive/`
 
 Experimental, alternative, and superseded work, **not part of the deployed
@@ -125,4 +118,3 @@ pipeline** (kept for reference, ignored by colcon):
 | `square_controller` | Early waypoint/square path controller (superseded by the FSM). |
 | `puzzlebot_camera`, `camera_info_publisher` | Older camera nodes (superseded by `puzzlebot_ros/camera_rectify`; only the `aruco_jetson` demo still references them). |
 | `ros_deep_learning` | Third-party jetson-inference nodes. |
-| `papupapu2` | Rosbag of the validation run (data source for `report/`). |
