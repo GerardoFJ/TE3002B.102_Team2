@@ -37,10 +37,6 @@ DEFAULT_K = [
 ]
 DEFAULT_D = [-0.352616, 0.184246, 0.002804, 0.000020, -0.061219]
 
-# White-balance gains [B, G, R] from white_balance.yaml (method: patch-pick,
-# computed against /camera/image_rect/compressed).
-DEFAULT_WB_GAINS_BGR = [1.0161808729171753, 1.188890814781189, 0.8512064218521118]
-
 
 def build_gst_pipeline(sensor_id: int, width: int, height: int, fps: int,
                        flip_method: int = 0) -> str:
@@ -92,8 +88,6 @@ class CameraRectify(Node):
         self.declare_parameter('alpha', 0.0)
         self.declare_parameter('jpeg_quality', 80)
         self.declare_parameter('publish_uncompressed', True)
-        self.declare_parameter('wb_gains_bgr', DEFAULT_WB_GAINS_BGR)
-        self.declare_parameter('wb_enable', True)
 
         sensor_id = int(self.get_parameter('sensor_id').value)
         w = int(self.get_parameter('image_width').value)
@@ -120,25 +114,6 @@ class CameraRectify(Node):
             K, D, None, new_K, (w, h), cv2.CV_16SC2)
         self.get_logger().info(
             f'Precomputed rectify maps for {w}x{h}, alpha={alpha}')
-
-        # Precompute a 3-channel BGR white-balance LUT. Applied with a
-        # single cv2.LUT call per frame (~3 ms at 1280x720), which is
-        # cheaper than per-channel multiply + clip + cast in numpy.
-        gains = list(self.get_parameter('wb_gains_bgr').value)
-        wb_enable = bool(self.get_parameter('wb_enable').value)
-        if (wb_enable and len(gains) == 3
-                and not all(abs(g - 1.0) < 1e-3 for g in gains)):
-            lut = np.empty((1, 256, 3), dtype=np.uint8)
-            ramp = np.arange(256, dtype=np.float32)
-            for i, g in enumerate(gains):
-                lut[0, :, i] = np.clip(ramp * float(g), 0, 255).astype(np.uint8)
-            self._wb_lut = lut
-            self.get_logger().info(
-                f'WB enabled, gains BGR = '
-                f'[{gains[0]:.4f}, {gains[1]:.4f}, {gains[2]:.4f}]')
-        else:
-            self._wb_lut = None
-            self.get_logger().info('WB disabled (identity gains)')
 
         # Open the camera through the GStreamer pipeline.
         pipeline = build_gst_pipeline(sensor_id, w, h, fps, flip_method)
@@ -212,8 +187,6 @@ class CameraRectify(Node):
             rect = cv2.remap(frame, self._map1, self._map2,
                              interpolation=cv2.INTER_LINEAR,
                              borderMode=cv2.BORDER_CONSTANT)
-            if self._wb_lut is not None:
-                rect = cv2.LUT(rect, self._wb_lut)
             with self._slot_cv:
                 self._slot = (stamp, rect)
                 self._rect_seq += 1

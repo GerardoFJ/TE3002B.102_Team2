@@ -1,0 +1,21 @@
+{
+  "_doc": "Field order of /hough_features (std_msgs/Float32MultiArray). Indices are 0-based. Phase 2 (ml_steering) reads this to know which column is which.",
+  "_warning": "Four features (center_bottom, vanishing_x, mean_length, max_length) are in raw processing-pixel units and depend on the node's detect_scale parameter. If detect_scale differs between training and inference, the model breaks silently. Pin detect_scale identically in both pipelines.",
+  "n_features": 14,
+  "fields": [
+    {"index":  0, "name": "n_lines",         "unit": "count",        "normalized": false},
+    {"index":  1, "name": "mean_angle",      "unit": "rad",          "normalized": false, "range": "[-pi/2, pi/2]"},
+    {"index":  2, "name": "std_angle",       "unit": "rad",          "normalized": false},
+    {"index":  3, "name": "mean_abs_angle",  "unit": "rad",          "normalized": false},
+    {"index":  4, "name": "mean_length",     "unit": "pixels",       "normalized": false, "scale_dependent": true},
+    {"index":  5, "name": "max_length",      "unit": "pixels",       "normalized": false, "scale_dependent": true},
+    {"index":  6, "name": "left_count",      "unit": "count",        "normalized": false},
+    {"index":  7, "name": "right_count",     "unit": "count",        "normalized": false},
+    {"index":  8, "name": "balance_lr",      "unit": "ratio",        "normalized": true,  "range": "[-1, 1]"},
+    {"index":  9, "name": "center_bottom",   "unit": "pixels",       "normalized": false, "scale_dependent": true},
+    {"index": 10, "name": "center_error",    "unit": "fraction",     "normalized": true,  "range": "[-1, 1]"},
+    {"index": 11, "name": "vanishing_x",     "unit": "pixels",       "normalized": false, "scale_dependent": true},
+    {"index": 12, "name": "vanishing_error", "unit": "fraction",     "normalized": true,  "range": "[-1, 1]"},
+    {"index": 13, "name": "confidence",      "unit": "heuristic",    "normalized": true,  "range": "[0, 1]"}
+  ]
+}

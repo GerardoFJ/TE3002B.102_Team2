@@ -1,0 +1,14 @@
+# follow_single_line detection params (live-tuned)
+detect_scale: 0.610
+roi_top_frac: 0.670
+roi_bottom_frac: 1.000
+roi_left_frac: 0.200
+roi_right_frac: 0.630
+gaussian_ksize: 3
+median_ksize: 5
+black_threshold: 122
+open_kernel: 8
+close_kernel_h: 11
+min_line_area: 434
+max_line_width_frac: 1.000
+min_line_height_frac: 0.590

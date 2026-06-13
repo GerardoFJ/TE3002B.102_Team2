@@ -7,3 +7,15 @@ dataset_ultra/
 build/
 install/
 log/
+
+# Reporte del proyecto (LaTeX + figuras + datos extraídos)
+PuzzleBot_Development/report/
+
+# ROS 2 bags (cualquier carpeta de bag y sus archivos de datos)
+*.db3
+*.db3-shm
+*.db3-wal
+*.mcap
+**/rosbag2_*/
+**/*_bag/
+PuzzleBot_Development/archive/papupapu2/

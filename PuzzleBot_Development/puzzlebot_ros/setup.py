@@ -43,7 +43,7 @@ setup(
                 'kalman = puzzlebot_ros.kalman:main',
                 'kalman_aruco = puzzlebot_ros.kalman_aruco:main',
                 'goto_point = puzzlebot_ros.goto_point:main',
-                'camera_rectify = puzzlebot_ros.rectify_compress:main'
+                'camera_rectify = puzzlebot_ros.rectify_compress:main',
         ],
     },
 )

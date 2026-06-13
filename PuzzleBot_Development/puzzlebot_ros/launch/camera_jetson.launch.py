@@ -28,17 +28,15 @@ from launch.actions import SetEnvironmentVariable
 from launch_ros.actions import Node
 
 
-# Calibration from calibration_output/calibration.txt (1280x720)
+# Geometric (chessboard) calibration from calibration_output/calibration.txt
+# (1280x720). This is the ONLY camera correction applied — there is no colour
+# correction in the pipeline.
 CAMERA_MATRIX = [
     809.551247, 0.0,        669.692191,
     0.0,        805.624908, 308.610156,
     0.0,        0.0,        1.0,
 ]
 DISTORTION = [-0.352616, 0.184246, 0.002804, 0.000020, -0.061219]
-
-# White-balance gains [B, G, R] from white_balance.yaml (patch-pick method
-# against /camera/image_rect/compressed).
-WB_GAINS_BGR = [1.0161808729171753, 1.188890814781189, 0.8512064218521118]
 
 
 def generate_launch_description():
@@ -69,8 +67,6 @@ def generate_launch_description():
             'alpha': 0.0,            # 0 = crop black borders, 1 = full FOV
             'jpeg_quality': 80,      # good quality / bandwidth tradeoff
             'publish_uncompressed': True,
-            'wb_gains_bgr': WB_GAINS_BGR,
-            'wb_enable': True,
         }],
         output='screen',
     )

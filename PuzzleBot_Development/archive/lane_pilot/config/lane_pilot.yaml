@@ -1,0 +1,94 @@
+# Tuning parameters for the metric lane follower (lane_pilot package).
+# The camera->ground homography path is NOT here (it is machine-specific) — pass
+# it as the `homography_file` launch argument.
+
+lane_ipm_node:
+  ros__parameters:
+    input_topic: /camera/image_rect/compressed
+    output_topic: /lane/points
+    base_frame: base_link
+
+    # Bird's-eye (metric top-down) extents, in base_link meters.
+    bird_x_min: 0.01      # nearest forward distance the camera can see
+    bird_x_max: 0.70      # farthest forward distance to map
+    bird_y_half: 0.60     # half lateral width of the view
+    bird_mpp: 0.0025      # meters per pixel
+
+    # Middle-line detection on the bird's-eye image.
+    # Tuned interactively with tools/lane_debug_qt.py against this track (2026-06-09).
+    # invert_threshold=true -> dark-line detection (gray<=thr) with the no-data
+    # warp border excluded. thr 130 catches the slightly-grey line under this lighting.
+    black_threshold: 108
+    invert_threshold: true
+    blur_ksize: 1         # <3 disables blur
+    open_px: 5            # morphological OPEN kernel — removes speckle noise
+    close_px: 3           # morphological CLOSE kernel — fills line gaps
+    min_cluster_px: 1     # (morph open does the noise rejection)
+    max_cluster_px: 26    # reject wide areas (open floor)
+    row_step: 2
+    max_jump_m: 0.04      # max lateral jump of the tracked line between rows
+    min_points: 7         # fewer centerline points than this -> detection invalid
+
+    # Region of interest (base_link meters): search only this ground band so
+    # off-track floor and background (warped into the far/side bird's-eye) are
+    # ignored. All detector params are live-tunable: ros2 param set /lane_ipm_node ...
+    roi_x_min: 0.17
+    roi_x_max: 0.47
+    roi_y_half: 0.29
+
+    # Raw image-space crop (fractions of the image): black out everything outside
+    # this rectangle BEFORE warping, to drop the horizon/background + side floor at
+    # the source. (0, 1, 0, 1 = no crop.) Live-tunable.
+    raw_top_frac: 0.36
+    raw_bottom_frac: 1.0
+    raw_left_frac: 0.0
+    raw_right_frac: 1.0
+
+    publish_debug_image: true
+    debug_jpeg_quality: 70
+
+lane_pilot_node:
+  ros__parameters:
+    input_topic: /lane/points
+    odom_topic: /odom
+    cmd_topic: /cmd_vel
+    odom_frame: odom
+    control_rate: 30.0
+
+    # Speed envelope.
+    v_max: 0.12
+    v_min: 0.03
+    max_angular: 1.8
+
+    # Adaptive pure-pursuit lookahead (m): L = base + k*v, clamped, capped to horizon.
+    # Kept BEYOND the ~21 cm blind spot so the pursuit target lands on real
+    # perceived centerline, not the extrapolated near field.
+    lookahead_base: 0.30
+    lookahead_k: 0.2
+    lookahead_min: 0.25
+    lookahead_max: 0.27
+
+    # Curvature-regulated slow-down. kappa_ref ~ 1/Rmin (4.0 -> R 0.25 m).
+    curv_slow_gain: 0.7
+    curv_kappa_ref: 4.0
+    curv_eval_x: 0.24
+
+    # Centerline fit + odom memory.
+    max_degree: 2
+    mem_time: 1.6         # seconds a remembered point survives
+    mem_max_points: 1500
+    x_keep_min: -0.20     # keep memory points from just behind ...
+    x_keep_max: 0.80      # ... to this far ahead (base_link X)
+    y_keep: 0.40
+    min_points_for_fit: 5
+    min_span: 0.05
+    short_path_x: 0.30    # below this visible horizon, slow proportionally
+    lost_timeout: 0.6     # no fresh detection for this long -> ramp to stop
+
+    # Traffic-light gate (reuses /traffic_light/go from the traffic_light node).
+    enable_traffic_light: true
+    traffic_light_topic: /traffic_light/go
+
+    publish_path: true
+    publish_debug_image: true   # /lane/pilot_debug/compressed (top-down worldview)
+    debug_jpeg_quality: 70
