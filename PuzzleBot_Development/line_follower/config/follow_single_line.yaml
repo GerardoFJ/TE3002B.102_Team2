@@ -1,0 +1,70 @@
+# follow_single_line parameters.
+# Run:  ros2 run line_follower follow_single_line --ros-args \
+#         --params-file ~/PuzzlebotMain/PuzzleBot_Development/line_follower/config/follow_single_line.yaml
+# Everything here can also be changed live:  ros2 param set /follow_single_line <name> <value>
+follow_single_line:
+  ros__parameters:
+    # ---- control ----
+    linear_speed: 0.10        # m/s on straights
+    max_angular: 1.65          # rad/s cap
+    kp: 0.7                   # steering gain (higher = turns harder)
+    kd: 0.01                  # damping (raise if it oscillates)
+    slow_on_turn: 0.5         # 0..1, how much to slow down in curves
+    center_offset: 0.0        # camera side-mount bias, in HUD "err" units.
+                              # CALIBRATE: center robot on the line by hand,
+                              # read err from the debug HUD, put that value here.
+
+    # ---- lost-line decisions (YOLO) ----
+    # NOTE: when the line is lost the robot STOPS, waits lost_decision_s,
+    # then decides from the YOLO detections.
+    lost_decision_s: 1.5      # stand-still wait before deciding
+    det_fresh_s: 4.0          # how recent a detection must be to count
+    det_min_conf: 0.45        # ignore detections below this confidence
+    det_min_area: 0.0095      # ignore bboxes smaller than this image fraction
+                              # (= far-away lights/signs from other intersections).
+                              # HUD shows the area of accepted detections (a0.012).
+    det_similar_ratio: 0.7    # two signals of similar size (small/big area ratio
+                              # >= this) -> prefer the one more to the RIGHT
+    stop_hold_s: 2.0          # STOP sign: halt; resume this long after last sighting
+    inter_forward_m: 0.25     # intersection: drive this far straight...
+    inter_turn_deg: 70.0      # ...then turn this many degrees toward the arrow
+    turn_speed: 1.0           # rad/s during the 90-degree turn
+    exit_forward_m: 0.10      # after the turn: roll this far straight (odom)
+                              # before handing back to line following
+    straight_forward_m: 0.30  # straight arrow: cross the intersection blind
+                              # this far (odom), then search the line
+
+    # ---- detection (from tools/tuned_single_params.yaml) ----
+   # detect_scale: 0.600
+   # roi_top_frac: 0.700
+   # roi_bottom_frac: 1.000
+   # roi_left_frac: 0.300
+   # roi_right_frac: 0.630
+   # gaussian_ksize: 3
+   # median_ksize: 0
+   # black_threshold: 170   
+   # open_kernel: 8
+   # close_kernel_h: 11
+   # min_line_area: 450
+   # max_line_width_frac: 0.80
+   # min_line_height_frac: 0.72
+    detect_scale: 0.610
+    roi_top_frac: 0.670
+    roi_bottom_frac: 1.000
+    roi_left_frac: 0.200
+    roi_right_frac: 0.630
+    gaussian_ksize: 3
+    median_ksize: 5
+    black_threshold: 96
+    open_kernel: 8
+    close_kernel_h: 11
+    min_line_area: 434
+    max_line_width_frac: 1.000
+    min_line_height_frac: 0.590
+    # ---- misc ----
+    publish_rate: 20.0
+    publish_debug_image: true
+    debug_jpeg_quality: 70
+    enable_traffic_light: true
+    detections_topic: /yolo/detections
+    odom_topic: /odom

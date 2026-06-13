@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lane_pilot</name>
+  <version>0.0.0</version>
+  <description>Metric lane follower for the Puzzlebot. Projects the camera image to a
+    ground-plane bird's-eye view (inverse perspective mapping), detects the middle
+    line of a 3-line lane, accumulates the centerline in the odom frame so the
+    camera blind spot (the few cm directly in front of the robot) is filled from
+    memory, and tracks it with regulated pure pursuit. Replaces the purely reactive
+    image-space follower for robust tight-curve navigation.</description>
+  <maintainer email="puzzlebot@todo.todo">puzzlebot</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>libopencv-dev</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
